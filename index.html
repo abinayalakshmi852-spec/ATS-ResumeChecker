@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATS Resume Checker</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --card: #1a1a26;
+    --border: #2a2a40;
+    --accent: #5b5bff;
+    --accent2: #00e5c3;
+    --accent3: #ff5b8a;
+    --text: #e8e8f0;
+    --muted: #6a6a8a;
+    --good: #00e5c3;
+    --warn: #ffb547;
+    --bad: #ff5b8a;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(91,91,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(91,91,255,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    margin-bottom: 48px;
+    animation: fadeDown 0.6s ease both;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    border: 1px solid rgba(0,229,195,0.3);
+    background: rgba(0,229,195,0.06);
+    padding: 4px 12px;
+    border-radius: 2px;
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  h1 span {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .subtitle {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+
+  /* Main card */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    animation: fadeUp 0.7s ease 0.1s both;
+  }
+
+  .card-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(91,91,255,0.04);
+  }
+
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot-red { background: #ff5b8a; }
+  .dot-yellow { background: #ffb547; }
+  .dot-green { background: #00e5c3; }
+
+  .card-label {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .card-body { padding: 24px; }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    background: var(--surface);
+    padding: 4px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 8px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .tab-btn.active {
+    background: var(--accent);
+    color: white;
+  }
+
+  .tab-btn:hover:not(.active) { color: var(--text); background: var(--border); }
+
+  /* Textarea */
+  .textarea-wrap { position: relative; }
+
+  .char-count {
+    position: absolute;
+    bottom: 10px;
+    right: 14px;
+    font-size: 11px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+
+  textarea {
+    width: 100%;
+    height: 240px;
+    padding: 16px;
+    padding-bottom: 32px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--muted); }
+
+  /* Job description input */
+  .job-section { margin-bottom: 20px; }
+  .job-section label {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    padding: 12px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="text"]:focus { border-color: var(--accent); }
+  input[type="text"]::placeholder { color: var(--muted); }
+
+  /* Actions */
+  .actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary {
+    flex: 1;
+    min-width: 180px;
+    padding: 14px 24px;
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: white;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.12));
+    pointer-events: none;
+  }
+
+  .btn-primary:hover { background: #4848ee; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(91,91,255,0.35); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-secondary {
+    padding: 14px 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .btn-secondary:hover { color: var(--text); border-color: var(--accent); }
+
+  /* Results */
+  #results-section { margin-top: 32px; animation: fadeUp 0.5s ease both; }
+
+  .score-display {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 24px;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+
+  .score-ring-wrap { position: relative; width: 120px; height: 120px; flex-shrink: 0; }
+
+  .score-ring-wrap svg { transform: rotate(-90deg); }
+
+  .ring-bg { fill: none; stroke: var(--border); stroke-width: 8; }
+  .ring-fill {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.4s;
+  }
+
+  .score-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .score-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .score-pct { font-size: 11px; color: var(--muted); }
+
+  .score-info { flex: 1; }
+  .score-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .score-desc { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 16px; }
+
+  .score-bar-wrap { display: flex; align-items: center; gap: 10px; }
+  .score-bar-track {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .score-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1) 0.3s;
+    width: 0%;
+  }
+
+  /* Sections grid */
+  .results-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  @media(max-width: 620px) { .results-grid { grid-template-columns: 1fr; } }
+
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+
+  .result-card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .result-card-title .icon { font-size: 16px; }
+
+  /* Keyword pills */
+  .keyword-list { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .kw-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+    border: 1px solid;
+  }
+
+  .kw-found {
+    background: rgba(0,229,195,0.08);
+    border-color: rgba(0,229,195,0.3);
+    color: var(--good);
+  }
+
+  .kw-missing {
+    background: rgba(255,91,138,0.08);
+    border-color: rgba(255,91,138,0.3);
+    color: var(--bad);
+  }
+
+  /* Issues list */
+  .issue-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .issue-item:last-child { border-bottom: none; padding-bottom: 0; }
+
+  .issue-icon { flex-shrink: 0; margin-top: 1px; }
+
+  .issue-warn { color: var(--warn); }
+  .issue-ok { color: var(--good); }
+  .issue-bad { color: var(--bad); }
+
+  /* Tips */
+  .tip-item {
+    display: flex;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .tip-item:last-child { border-bottom: none; }
+  .tip-num {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    margin-top: 1px;
+  }
+
+  /* Readability meter */
+  .readability-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .readability-row:last-child { border-bottom: none; }
+  .readability-label { color: var(--muted); }
+  .readability-val { font-weight: 500; }
+
+  .status-good { color: var(--good); }
+  .status-warn { color: var(--warn); }
+  .status-bad { color: var(--bad); }
+
+  /* Full-width card */
+  .result-card-full {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  /* Animations */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .hidden { display: none; }
+
+  /* Loader */
+  .loader {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Highlight in textarea */
+  .section-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 24px 0 20px;
+  }
+
+  .section-divider span {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+
+  .divider-line { flex: 1; height: 1px; background: var(--border); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="badge">// ATS Intelligence v2.0</div>
+    <h1>Resume <span>ATS Checker</span></h1>
+    <p class="subtitle">Analyze keyword density · Format compliance · Readability metrics</p>
+  </header>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="dot dot-red"></div>
+      <div class="dot dot-yellow"></div>
+      <div class="dot dot-green"></div>
+      <span class="card-label">resume_analyzer.js</span>
+    </div>
+    <div class="card-body">
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('general')">General Check</button>
+        <button class="tab-btn" onclick="switchTab('custom')">Custom Job Match</button>
+      </div>
+
+      <!-- General tab -->
+      <div id="tab-general">
+        <div class="job-section">
+          <label>Target Role (optional)</label>
+          <input type="text" id="target-role" placeholder="e.g. Software Engineer, Data Analyst, Product Manager…">
+        </div>
+
+        <div class="textarea-wrap">
+          <textarea id="resume" placeholder="Paste your resume text here…&#10;&#10;Include: Contact Info · Summary · Skills · Experience · Education · Certifications" oninput="updateCount()"></textarea>
+          <span class="char-count" id="char-count">0 words</span>
+        </div>
+      </div>
+
+      <!-- Custom tab -->
+      <div id="tab-custom" class="hidden">
+        <div class="job-section">
+          <label>Job Description</label>
+          <textarea id="job-desc" style="height:120px;" placeholder="Paste the full job description here to match keywords from it…"></textarea>
+        </div>
+        <div class="job-section" style="margin-top:12px;">
+          <label>Your Resume</label>
+          <textarea id="resume-custom" placeholder="Paste your resume here…" oninput="updateCountCustom()"></textarea>
+          <span class="char-count" id="char-count-custom">0 words</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-primary" id="check-btn" onclick="runCheck()">▶ Analyze Resume</button>
+        <button class="btn-secondary" onclick="clearAll()">✕ Clear</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results-section" class="hidden">
+
+    <!-- Score display -->
+    <div class="section-divider">
+      <div class="divider-line"></div>
+      <span>Analysis Results</span>
+      <div class="divider-line"></div>
+    </div>
+
+    <div class="score-display">
+      <div class="score-ring-wrap">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle class="ring-bg" cx="60" cy="60" r="52"/>
+          <circle class="ring-fill" id="ring-fill" cx="60" cy="60" r="52"
+            stroke-dasharray="326.7" stroke-dashoffset="326.7"/>
+        </svg>
+        <div class="score-center">
+          <div class="score-num" id="score-num">0</div>
+          <div class="score-pct">/ 100</div>
+        </div>
+      </div>
+      <div class="score-info">
+        <div class="score-label" id="score-label">—</div>
+        <div class="score-desc" id="score-desc">—</div>
+        <div class="score-bar-wrap">
+          <div class="score-bar-track">
+            <div class="score-bar-fill" id="score-bar"></div>
+          </div>
+          <span style="font-size:11px;color:var(--muted)" id="score-pct-label">0%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grid: Keywords + Issues -->
+    <div class="results-grid">
+
+      <div class="result-card">
+        <div class="result-card-title"><span class="icon">🔍</span> Keywords Found</div>
+        <div class="keyword-list" id="keywords-found"></div>
+      </div>
+
+      <div class="result-card">
+        <div class="result-card-title"><span class="icon">⚠️</span> Missing Keywords</div>
+        <div class="keyword-list" id="keywords-missing"></div>
+      </div>
+
+    </div>
+
+    <!-- Readability + Section Check -->
+    <div class="results-grid">
+
+      <div class="result-card">
+        <div class="result-card-title"><span class="icon">📊</span> Resume Metrics</div>
+        <div id="metrics-list"></div>
+      </div>
+
+      <div class="result-card">
+        <div class="result-card-title"><span class="icon">📋</span> Section Check</div>
+        <div id="sections-list"></div>
+      </div>
+
+    </div>
+
+    <!-- Tips -->
+    <div class="result-card-full">
+      <div class="result-card-title"><span class="icon">💡</span> Improvement Tips</div>
+      <div id="tips-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────
+let activeTab = 'general';
+
+// ─── Keyword Banks ────────────────────────────────────────────
+const GENERAL_KEYWORDS = {
+  technical: ['python','java','javascript','typescript','sql','html','css','react','node','aws','azure','gcp','docker','kubernetes','git','api','rest','agile','scrum','linux','cloud'],
+  professional: ['project management','team lead','cross-functional','stakeholder','communication','problem-solving','analytical','leadership','collaboration','strategic'],
+  resume_sections: ['experience','education','skills','summary','objective','certifications','achievements','projects','references'],
+  action_verbs: ['managed','developed','led','designed','implemented','increased','reduced','delivered','built','launched','improved','optimized','created','coordinated','analyzed']
+};
+
+const ROLE_KEYWORDS = {
+  'software engineer': ['algorithms','data structures','oop','testing','debugging','version control','ci/cd','microservices','database','backend','frontend'],
+  'data analyst': ['excel','tableau','power bi','r','statistics','visualization','reporting','dashboard','etl','data cleaning','insights'],
+  'product manager': ['roadmap','user stories','kpi','metrics','a/b testing','product strategy','backlog','sprint','customer research','go-to-market'],
+  'designer': ['figma','sketch','ux','ui','wireframe','prototyping','user research','typography','accessibility','design system'],
+  'marketing': ['seo','content','campaigns','analytics','social media','brand','growth','conversion','email marketing','ppc'],
+};
+
+// ─── Sections expected ────────────────────────────────────────
+const EXPECTED_SECTIONS = [
+  { name: 'Contact Info', patterns: ['email','phone','linkedin','github','@','contact'] },
+  { name: 'Summary / Objective', patterns: ['summary','objective','profile','about'] },
+  { name: 'Work Experience', patterns: ['experience','work history','employment','worked at','position'] },
+  { name: 'Education', patterns: ['education','university','college','degree','bachelor','master','phd','diploma'] },
+  { name: 'Skills', patterns: ['skills','technologies','tools','proficiencies','expertise'] },
+  { name: 'Certifications', patterns: ['certif','license','credential','award','course'] },
+];
+
+// ─── Tab switch ────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='general')||(i===1&&tab==='custom')));
+  document.getElementById('tab-general').classList.toggle('hidden', tab!=='general');
+  document.getElementById('tab-custom').classList.toggle('hidden', tab!=='custom');
+}
+
+// ─── Word count ────────────────────────────────────────────────
+function wordCount(text) { return text.trim() ? text.trim().split(/\s+/).length : 0; }
+function updateCount() {
+  const w = wordCount(document.getElementById('resume').value);
+  document.getElementById('char-count').textContent = w + ' word' + (w!==1?'s':'');
+}
+function updateCountCustom() {
+  const w = wordCount(document.getElementById('resume-custom').value);
+  document.getElementById('char-count-custom').textContent = w + ' word' + (w!==1?'s':'');
+}
+
+// ─── Clear ─────────────────────────────────────────────────────
+function clearAll() {
+  ['resume','job-desc','resume-custom','target-role'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  document.getElementById('char-count').textContent = '0 words';
+  document.getElementById('char-count-custom').textContent = '0 words';
+  document.getElementById('results-section').classList.add('hidden');
+}
+
+// ─── Main analysis ─────────────────────────────────────────────
+function runCheck() {
+  let resumeText, keywordsToCheck;
+
+  if (activeTab === 'general') {
+    resumeText = document.getElementById('resume').value.trim();
+    if (!resumeText) { alert('Please paste your resume text first.'); return; }
+    const role = document.getElementById('target-role').value.trim().toLowerCase();
+    keywordsToCheck = [...GENERAL_KEYWORDS.technical, ...GENERAL_KEYWORDS.professional, ...GENERAL_KEYWORDS.action_verbs];
+    // Add role-specific keywords
+    for (const [key, kws] of Object.entries(ROLE_KEYWORDS)) {
+      if (role.includes(key)) keywordsToCheck = [...keywordsToCheck, ...kws];
+    }
+  } else {
+    resumeText = document.getElementById('resume-custom').value.trim();
+    const jobDesc = document.getElementById('job-desc').value.trim();
+    if (!resumeText) { alert('Please paste your resume.'); return; }
+    if (!jobDesc) { alert('Please paste the job description for custom matching.'); return; }
+    // Extract keywords from job description
+    keywordsToCheck = extractKeywordsFromJD(jobDesc);
+  }
+
+  const btn = document.getElementById('check-btn');
+  btn.innerHTML = '<span class="loader"></span>Analyzing…';
+  btn.disabled = true;
+
+  setTimeout(() => {
+    const result = analyze(resumeText.toLowerCase(), keywordsToCheck, resumeText);
+    renderResults(result);
+    btn.innerHTML = '▶ Analyze Resume';
+    btn.disabled = false;
+    document.getElementById('results-section').classList.remove('hidden');
+    document.getElementById('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 600);
+}
+
+// ─── Extract keywords from JD ──────────────────────────────────
+function extractKeywordsFromJD(jd) {
+  const lower = jd.toLowerCase();
+  const stopwords = new Set(['the','and','or','in','on','at','to','for','of','a','an','is','are','be','with','your','will','we','you','our','this','that','have','has','as','from','by','not','but','it','its','their','they','them','can','all','more','must','should','may','also','other','who','what','how','when','where','which','while','both','each','into','than','then','been','being','were','was','had','did','do','does','would','could','if','so','such','us','any','about','up','out','need','work','team','role','position','company','looking','seeking']);
+  const words = lower.match(/\b[a-z][a-z+#.]{1,}\b/g) || [];
+  const freq = {};
+  words.forEach(w => { if (!stopwords.has(w)) freq[w] = (freq[w]||0)+1; });
+  return Object.entries(freq).filter(([,c]) => c>=1).sort((a,b)=>b[1]-a[1]).slice(0,40).map(([w])=>w);
+}
+
+// ─── Core analyzer ─────────────────────────────────────────────
+function analyze(lower, keywords, raw) {
+  const unique = [...new Set(keywords.map(k=>k.toLowerCase()))];
+  const found = unique.filter(k => lower.includes(k));
+  const missing = unique.filter(k => !lower.includes(k));
+
+  // Section detection
+  const sections = EXPECTED_SECTIONS.map(s => ({
+    name: s.name,
+    present: s.patterns.some(p => lower.includes(p))
+  }));
+
+  // Metrics
+  const words = raw.trim().split(/\s+/).filter(Boolean);
+  const wc = words.length;
+  const lines = raw.split('\n').filter(l=>l.trim()).length;
+  const bullets = (raw.match(/^[\s]*[-•*▪▸◦]/gm) || []).length;
+  const hasQuantified = /\d+[\s]*(%|percent|x\b|\$|k\b|m\b|users|customers|team|projects|years|months)/i.test(raw);
+  const hasEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/.test(raw);
+  const hasPhone = /(\+?\d[\d\s\-().]{7,}\d)/.test(raw);
+  const hasLinkedIn = /linkedin/i.test(raw);
+  const avgWordLen = words.reduce((s,w)=>s+w.length,0)/(wc||1);
+  const sentenceLikeCount = (raw.match(/[.!?]+/g)||[]).length;
+
+  // Scoring
+  let score = 0;
+  const kwScore = Math.round((found.length / Math.max(unique.length,1)) * 40);
+  score += kwScore;
+
+  const sectionScore = Math.round((sections.filter(s=>s.present).length / sections.length) * 25);
+  score += sectionScore;
+
+  if (wc >= 300 && wc <= 900) score += 10;
+  else if (wc >= 200 && wc < 300) score += 5;
+  else if (wc > 900) score += 6;
+
+  if (hasQuantified) score += 8;
+  if (bullets >= 3) score += 7;
+  if (hasEmail) score += 5;
+  if (hasPhone) score += 3;
+  if (hasLinkedIn) score += 2;
+
+  score = Math.min(100, score);
+
+  const tips = generateTips({ found, missing, sections, wc, bullets, hasQuantified, hasEmail, hasPhone, hasLinkedIn, score });
+
+  return { score, found, missing, sections, wc, lines, bullets, hasQuantified, hasEmail, hasPhone, hasLinkedIn, avgWordLen, sentenceLikeCount, tips, kwPct: Math.round(found.length/Math.max(unique.length,1)*100) };
+}
+
+// ─── Tips generator ────────────────────────────────────────────
+function generateTips({ found, missing, sections, wc, bullets, hasQuantified, score }) {
+  const tips = [];
+  if (missing.length > 5) tips.push(`Add ${Math.min(missing.length,5)} missing keywords: <b>${missing.slice(0,5).join(', ')}</b> — ATS systems scan for exact matches.`);
+  if (!hasQuantified) tips.push('Quantify your achievements (e.g. "Increased sales by 35%", "Managed team of 8") — numbers boost credibility.');
+  if (bullets < 3) tips.push('Use bullet points (–, •) for each role to improve readability and ATS parsing.');
+  if (wc < 300) tips.push('Your resume is short. Aim for 400–700 words to give ATS enough content to parse.');
+  if (wc > 900) tips.push('Consider trimming to under 800 words — concise resumes perform better.');
+  const missingSecs = sections.filter(s => !s.present);
+  if (missingSecs.length) tips.push(`Missing sections detected: <b>${missingSecs.map(s=>s.name).join(', ')}</b>. Add these to improve structure.`);
+  if (score < 50) tips.push('Try tailoring this resume specifically to each job description for better keyword alignment.');
+  tips.push('Save your resume as a plain .docx or .pdf — avoid tables, columns, and graphics that confuse ATS parsers.');
+  tips.push('Use standard section headings like "Work Experience" and "Education" instead of creative alternatives.');
+  return tips.slice(0, 6);
+}
+
+// ─── Render results ────────────────────────────────────────────
+function renderResults(r) {
+  // Score ring
+  const circumference = 326.7;
+  const offset = circumference - (r.score / 100) * circumference;
+  const ring = document.getElementById('ring-fill');
+  const color = r.score >= 70 ? '#00e5c3' : r.score >= 45 ? '#ffb547' : '#ff5b8a';
+  ring.style.stroke = color;
+  ring.style.strokeDashoffset = circumference;
+  setTimeout(() => ring.style.strokeDashoffset = offset, 100);
+
+  document.getElementById('score-num').textContent = r.score;
+  document.getElementById('score-num').style.color = color;
+
+  const bar = document.getElementById('score-bar');
+  bar.style.background = color;
+  setTimeout(() => bar.style.width = r.score + '%', 200);
+  document.getElementById('score-pct-label').textContent = r.score + '%';
+
+  const labels = [
+    [80,'Excellent','Your resume is well-optimized and ATS-ready.'],
+    [65,'Good','Strong resume with minor gaps.'],
+    [45,'Fair','Several improvements needed to pass ATS filters.'],
+    [0,'Needs Work','Major revisions required for ATS compatibility.']
+  ];
+  const [,lbl,desc] = labels.find(([min]) => r.score >= min);
+  document.getElementById('score-label').textContent = lbl;
+  document.getElementById('score-label').style.color = color;
+  document.getElementById('score-desc').textContent = desc;
+
+  // Keywords
+  const foundEl = document.getElementById('keywords-found');
+  foundEl.innerHTML = r.found.length
+    ? r.found.map(k => `<span class="kw-pill kw-found">✓ ${k}</span>`).join('')
+    : '<span style="color:var(--muted);font-size:12px">No matching keywords found.</span>';
+
+  const missEl = document.getElementById('keywords-missing');
+  missEl.innerHTML = r.missing.length
+    ? r.missing.slice(0,20).map(k => `<span class="kw-pill kw-missing">✕ ${k}</span>`).join('')
+    : '<span style="color:var(--good);font-size:12px">All keywords found!</span>';
+
+  // Metrics
+  const metrics = [
+    ['Word Count', r.wc, r.wc>=300&&r.wc<=900?'good':r.wc<200?'bad':'warn'],
+    ['Bullet Points', r.bullets, r.bullets>=3?'good':r.bullets>=1?'warn':'bad'],
+    ['Has Email', r.hasEmail?'Yes':'No', r.hasEmail?'good':'bad'],
+    ['Has Phone', r.hasPhone?'Yes':'No', r.hasPhone?'good':'warn'],
+    ['Quantified Results', r.hasQuantified?'Yes':'No', r.hasQuantified?'good':'warn'],
+    ['LinkedIn Mention', r.hasLinkedIn?'Yes':'No', r.hasLinkedIn?'good':'warn'],
+    ['Keyword Match', r.kwPct+'%', r.kwPct>=60?'good':r.kwPct>=35?'warn':'bad'],
+  ];
+
+  document.getElementById('metrics-list').innerHTML = metrics.map(([label, val, status]) =>
+    `<div class="readability-row">
+      <span class="readability-label">${label}</span>
+      <span class="readability-val status-${status}">${val}</span>
+    </div>`
+  ).join('');
+
+  // Sections
+  document.getElementById('sections-list').innerHTML = r.sections.map(s =>
+    `<div class="issue-item">
+      <span class="issue-icon ${s.present?'issue-ok':'issue-bad'}">${s.present?'✓':'✕'}</span>
+      <span style="color:${s.present?'var(--text)':'var(--muted)'};">${s.name}</span>
+    </div>`
+  ).join('');
+
+  // Tips
+  document.getElementById('tips-list').innerHTML = r.tips.map((tip, i) =>
+    `<div class="tip-item">
+      <div class="tip-num">${i+1}</div>
+      <div>${tip}</div>
+    </div>`
+  ).join('');
+}
+</script>
+</body>
+</html>
